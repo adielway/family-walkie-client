@@ -25,7 +25,7 @@ async function join() {
   stream = await navigator.mediaDevices.getUserMedia({ audio: true });
   stream.getAudioTracks()[0].enabled = false;
 
-  socket = io("http://localhost:3001");
+  socket = io("https://family-walkie-server.onrender.com");
 
   socket.on("connect", () => socket.emit("join", { room }));
   socket.on("user-joined", id => addPeer(id, true));
