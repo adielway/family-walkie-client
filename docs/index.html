@@ -43,7 +43,16 @@ async function join() {
 }
 
 function addPeer(id, initiator) {
-  const peer = new SimplePeer({ initiator, stream });
+  const peer = new SimplePeer({
+  initiator,
+  stream,
+  config: {
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' }
+    ]
+  }
+});
+
   peers[id] = peer;
 
   peer.on("signal", data => socket.emit("signal", { target: id, data }));
