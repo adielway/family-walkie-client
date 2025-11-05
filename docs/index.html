@@ -19,9 +19,20 @@ Hold to Talk
 <script src="https://cdn.jsdelivr.net/npm/simple-peer@9/simplepeer.min.js"></script>
 <script>
 let socket, stream, peers = {};
+let audioCtx = null;
+
+function resumeAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === "suspended") {
+    audioCtx.resume();
+  }
+}
 
 async function join() {
   const room = document.getElementById("room").value;
+
   stream = await navigator.mediaDevices.getUserMedia({ audio: true });
   stream.getAudioTracks()[0].enabled = false;
 
@@ -35,50 +46,57 @@ async function join() {
   const btn = document.getElementById("talkBtn");
   btn.disabled = false;
 
-  // Press-to-talk controls
-  btn.onmousedown = () => stream.getAudioTracks()[0].enabled = true;
-  btn.onmouseup = () => stream.getAudioTracks()[0].enabled = false;
-  btn.ontouchstart = () => stream.getAudioTracks()[0].enabled = true;
-  btn.ontouchend = () => stream.getAudioTracks()[0].enabled = false;
+  function startTalking() {
+    resumeAudio();
+    const track = stream.getAudioTracks()[0];
+    track.enabled = true;
+  }
+
+  function stopTalking() {
+    const track = stream.getAudioTracks()[0];
+    track.enabled = false;
+  }
+
+  btn.onmousedown = startTalking;
+  btn.onmouseup = stopTalking;
+  btn.ontouchstart = startTalking;
+  btn.ontouchend = stopTalking;
 }
 
 function addPeer(id, initiator) {
   const peer = new SimplePeer({
-  initiator,
-  stream,
-  config: {
-  iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    {
-      urls: 'turn:global.relay.metered.ca:80',
-      username: 'open',
-      credential: 'open'
+    initiator,
+    stream,
+    config: {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        {
+          urls: 'turn:global.relay.metered.ca:80',
+          username: 'open',
+          credential: 'open'
+        }
+      ]
     }
-  ]
-}
-
-});
+  });
 
   peers[id] = peer;
 
   peer.on("signal", data => socket.emit("signal", { target: id, data }));
 
- peer.on("stream", remote => {
-  const audio = document.createElement("audio");
-  audio.srcObject = remote;
-  audio.autoplay = true;
-  audio.playsInline = true;
-  audio.muted = false;
-  document.body.appendChild(audio);
+  peer.on("stream", remote => {
+    const audio = document.createElement("audio");
+    audio.srcObject = remote;
+    audio.autoplay = true;
+    audio.playsInline = true;
+    audio.muted = false;
+    document.body.appendChild(audio);
 
-  // FORCE playback (critical fix)
-  audio.play().catch(() => {
-    // If browser blocks it, we wait for a tap
-    window.addEventListener("click", () => audio.play(), { once: true });
-    window.addEventListener("touchstart", () => audio.play(), { once: true });
+    // Force playback if browser blocks autoplay
+    audio.play().catch(() => {
+      window.addEventListener("click", () => audio.play(), { once: true });
+      window.addEventListener("touchstart", () => audio.play(), { once: true });
+    });
   });
-});
-
 }
 </script>
 </body>
