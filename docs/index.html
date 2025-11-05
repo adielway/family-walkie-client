@@ -19,22 +19,20 @@ Hold to Talk
 <script src="https://cdn.jsdelivr.net/npm/simple-peer@9/simplepeer.min.js"></script>
 <script>
 let socket, stream, peers = {};
-let audioCtx = null;
-
-function resumeAudio() {
-  if (!audioCtx) {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  }
-  if (audioCtx.state === "suspended") {
-    audioCtx.resume();
-  }
-}
+let audioCtx, sourceNode, gainNode;
 
 async function join() {
   const room = document.getElementById("room").value;
 
+  // Always send the microphone stream
   stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  stream.getAudioTracks()[0].enabled = false;
+
+  // Create audio context to control volume (push-to-talk)
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  sourceNode = audioCtx.createMediaStreamSource(stream);
+  gainNode = audioCtx.createGain();
+  gainNode.gain.value = 0; // start muted
+  sourceNode.connect(gainNode).connect(audioCtx.destination);
 
   socket = io("https://family-walkie-server.onrender.com");
 
@@ -44,17 +42,15 @@ async function join() {
   socket.on("signal", ({ source, data }) => peers[source]?.signal(data));
 
   const btn = document.getElementById("talkBtn");
-  btn.disabled = false;
+  btn.disabled = true;
+  setTimeout(() => btn.disabled = false, 500);
 
   function startTalking() {
-    resumeAudio();
-    const track = stream.getAudioTracks()[0];
-    track.enabled = true;
+    audioCtx.resume();
+    gainNode.gain.value = 1; // unmute
   }
-
   function stopTalking() {
-    const track = stream.getAudioTracks()[0];
-    track.enabled = false;
+    gainNode.gain.value = 0; // mute
   }
 
   btn.onmousedown = startTalking;
@@ -91,7 +87,6 @@ function addPeer(id, initiator) {
     audio.muted = false;
     document.body.appendChild(audio);
 
-    // Force playback if browser blocks autoplay
     audio.play().catch(() => {
       window.addEventListener("click", () => audio.play(), { once: true });
       window.addEventListener("touchstart", () => audio.play(), { once: true });
@@ -99,5 +94,6 @@ function addPeer(id, initiator) {
   });
 }
 </script>
+
 </body>
 </html>
