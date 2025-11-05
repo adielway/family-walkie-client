@@ -63,11 +63,22 @@ function addPeer(id, initiator) {
 
   peer.on("signal", data => socket.emit("signal", { target: id, data }));
 
-  peer.on("stream", remote => {
-    const audio = new Audio();
-    audio.srcObject = remote;
-    audio.autoplay = true;
+ peer.on("stream", remote => {
+  const audio = document.createElement("audio");
+  audio.srcObject = remote;
+  audio.autoplay = true;
+  audio.playsInline = true;
+  audio.muted = false;
+  document.body.appendChild(audio);
+
+  // FORCE playback (critical fix)
+  audio.play().catch(() => {
+    // If browser blocks it, we wait for a tap
+    window.addEventListener("click", () => audio.play(), { once: true });
+    window.addEventListener("touchstart", () => audio.play(), { once: true });
   });
+});
+
 }
 </script>
 </body>
