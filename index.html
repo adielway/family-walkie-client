@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Family Walkie Talkie</title>
+</head>
+<body style="font-family:sans-serif; text-align:center; padding:40px;">
+<h2>Family Walkie Talkie</h2>
+
+<input id="room" placeholder="Room name" value="family" /><br><br>
+<button onclick="join()">Join</button>
+
+<br><br>
+<button id="talkBtn" style="padding:30px 60px; font-size:18px;" disabled>
+Hold to Talk
+</button>
+
+<script src="https://cdn.jsdelivr.net/npm/socket.io-client@4/dist/socket.io.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/simple-peer@9/simplepeer.min.js"></script>
+<script>
+let socket, stream, peers = {};
+
+async function join() {
+  const room = document.getElementById("room").value;
+  stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  stream.getAudioTracks()[0].enabled = false;
+
+  socket = io("http://localhost:3001");
+
+  socket.on("connect", () => socket.emit("join", { room }));
+  socket.on("user-joined", id => addPeer(id, true));
+  socket.on("user-left", id => peers[id]?.destroy());
+  socket.on("signal", ({ source, data }) => peers[source]?.signal(data));
+
+  const btn = document.getElementById("talkBtn");
+  btn.disabled = false;
+
+  // Press-to-talk controls
+  btn.onmousedown = () => stream.getAudioTracks()[0].enabled = true;
+  btn.onmouseup = () => stream.getAudioTracks()[0].enabled = false;
+  btn.ontouchstart = () => stream.getAudioTracks()[0].enabled = true;
+  btn.ontouchend = () => stream.getAudioTracks()[0].enabled = false;
+}
+
+function addPeer(id, initiator) {
+  const peer = new SimplePeer({ initiator, stream });
+  peers[id] = peer;
+
+  peer.on("signal", data => socket.emit("signal", { target: id, data }));
+
+  peer.on("stream", remote => {
+    const audio = new Audio();
+    audio.srcObject = remote;
+    audio.autoplay = true;
+  });
+}
+</script>
+</body>
+</html>
